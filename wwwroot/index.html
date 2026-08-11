@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>AI Baggage Claim Assessment</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; color: #1a1a1a; }
+  h1 { font-size: 22px; }
+  fieldset { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 14px; }
+  input[type=file], textarea { width: 100%; margin-bottom: 12px; }
+  textarea { height: 80px; font-family: inherit; }
+  button { background: #1a56db; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 15px; }
+  button:disabled { background: #999; }
+  #result { margin-top: 24px; padding: 16px; border-radius: 8px; background: #f5f5f5; white-space: pre-wrap; font-family: monospace; font-size: 13px; display: none; }
+  .badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+  .approve { background: #d1fae5; color: #065f46; }
+  .reject { background: #fee2e2; color: #991b1b; }
+  .investigate { background: #fef3c7; color: #92400e; }
+  #status { font-size: 14px; color: #666; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <h1>AI-Powered Baggage Damage Claim Assessment</h1>
+
+  <form id="claimForm">
+    <fieldset>
+      <label for="passport">Passport image</label>
+      <input type="file" id="passport" accept="image/*" required />
+
+      <label for="boardingPass">Boarding pass image</label>
+      <input type="file" id="boardingPass" accept="image/*" required />
+
+      <label for="baggageImages">Damaged baggage images (1–5)</label>
+      <input type="file" id="baggageImages" accept="image/*" multiple required />
+
+      <label for="description">Claim description</label>
+      <textarea id="description" placeholder="Describe what happened to your baggage..."></textarea>
+    </fieldset>
+
+    <button type="submit" id="submitBtn">Generate AI Assessment</button>
+    <div id="status"></div>
+  </form>
+
+  <div id="result"></div>
+
+<script>
+const form = document.getElementById('claimForm');
+const resultDiv = document.getElementById('result');
+const statusDiv = document.getElementById('status');
+const submitBtn = document.getElementById('submitBtn');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const passport = document.getElementById('passport').files[0];
+  const boardingPass = document.getElementById('boardingPass').files[0];
+  const baggageFiles = document.getElementById('baggageImages').files;
+  const description = document.getElementById('description').value;
+
+  if (baggageFiles.length > 5) {
+    statusDiv.textContent = 'Please select at most 5 baggage images.';
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('passport', passport);
+  formData.append('boardingPass', boardingPass);
+  for (const f of baggageFiles) formData.append('baggageImages', f);
+  formData.append('description', description);
+
+  submitBtn.disabled = true;
+  statusDiv.textContent = 'Analyzing claim with AI... this can take 10-30 seconds.';
+  resultDiv.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/claims/assess', { method: 'POST', body: formData });
+    const data = await res.json();
+
+    statusDiv.textContent = '';
+    resultDiv.style.display = 'block';
+
+    if (data.error) {
+      resultDiv.textContent = 'Error: ' + data.error;
+    } else {
+      const badgeClass = data.recommendation === 'Approve' ? 'approve'
+        : data.recommendation === 'Reject' ? 'reject' : 'investigate';
+
+      resultDiv.innerHTML =
+        `<div class="badge ${badgeClass}">${data.recommendation}</div>\n` +
+        JSON.stringify(data, null, 2);
+    }
+  } catch (err) {
+    statusDiv.textContent = '';
+    resultDiv.style.display = 'block';
+    resultDiv.textContent = 'Request failed: ' + err.message;
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
